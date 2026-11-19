@@ -1,3 +1,45 @@
-# Bot-Arena-Clone
+# Boltyard
 
-Home of Boltyard, an original bot-building arena game.
+A browser game about building battle bots from parts and sending a team of up to three into arena fights.
+It is an original game inspired by the genre of old Flash bot-builder games: its own name, parts, arenas,
+rules and code-drawn art.
+
+Play: open `index.html` through any static web server (no build step, no dependencies).
+
+```bash
+python3 -m http.server 8123   # then visit http://localhost:8123/
+```
+
+## How it plays
+
+- **Garage**: each bot has a Frame (HP, carry capacity, weapon slots), a Drive (speed), 1 to 3 Weapons,
+  Plating (HP and armour) and a Module. Tap a slot to buy, fit, upgrade (L1 to L3) or sell parts.
+  Weight must stay under the frame's capacity, and heavy bots slow down if the drive can't pull them.
+- **Arenas**: ten fights, each unlocked by winning the one before. Wins pay credits; losses pay 30%,
+  replays 40%, so you can never get stuck. PWR numbers compare your team with the opponents.
+- **Battle**: bots fight on their own using the tactic you set (Rush, Range, Flank).
+  Tap or click an enemy to make your whole team focus it. Speed 1x/2x/4x and pause in the top bar.
+- Armour takes a flat amount off every hit, so fast weak weapons struggle against plated bots,
+  and the Arc Lance and Railspike pierce part of it.
+
+## Code map
+
+| File | What it does |
+| --- | --- |
+| `js/data.js` | All parts, arenas, enemy teams and prices. Balance lives here. |
+| `js/bot.js` | Turns a bot's parts into stats (HP, armour, speed, DPS) and a PWR rating. |
+| `js/sim.js` | The battle simulation: movement, targeting, weapons, damage. No drawing, seeded random numbers, so the same seed replays the same fight. |
+| `js/render.js` | Canvas drawing of bots, arenas, effects, the battle camera and part icons. |
+| `js/main.js` | Save game (localStorage), garage and arena screens, battle loop and input. |
+
+## Tests
+
+```bash
+node tests/sim.test.mjs          # simulation checks (Node 18+)
+python3 -m http.server 8123 &    # then, with Playwright installed:
+node tests/e2e.js [screenshot-dir]
+node tools/balance.mjs           # can a player who won every earlier arena afford a winning team?
+```
+
+`tests/e2e.js` clicks and taps through the real UI on a desktop viewport and an emulated iPhone 13:
+buying, upgrading, unlocking a bay, focus-fire by clicking or tapping an enemy, winning arena 1, and saving.
