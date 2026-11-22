@@ -18,6 +18,9 @@ python3 -m http.server 8123   # then visit http://localhost:8123/
 - **Arenas**: 20 fights in four leagues, each league ending in a boss. Each fight unlocks the next.
   Wins pay credits; losses and replays pay 25%, so you can never get stuck. From arena 6 enemy teams
   focus fire on your weakest bot. PWR numbers compare your team with the opponents.
+- **Duel**: build a team on a fixed 4000-credit budget (separate from the campaign) and send a
+  challenge link. The team is packed into the link itself (`#duel=...`), so there is no server: your
+  friend's browser checks every part and the budget, then runs the fight. They can send their team back.
 - **Battle**: bots fight on their own using the tactic you set (Rush, Range, Flank).
   Tap or click an enemy to make your whole team focus it. Speed 1x/2x/4x and pause in the top bar.
 - Armour takes a flat amount off every hit, so fast weak weapons struggle against plated bots,
@@ -32,6 +35,7 @@ python3 -m http.server 8123   # then visit http://localhost:8123/
 | `js/bot.js` | Turns a bot's parts into stats (HP, armour, speed, DPS) and a PWR rating. |
 | `js/sim.js` | The battle simulation: movement, targeting, weapons, damage. No drawing, seeded random numbers, so the same seed replays the same fight. |
 | `js/render.js` | Canvas drawing of bots, arenas, effects, the battle camera and part icons. |
+| `js/duel.js` | Packs a duel team into a short link code and checks a received one (parts, levels, weight, budget). |
 | `js/main.js` | Save game (localStorage), garage and arena screens, battle loop and input. |
 
 ## Tests
