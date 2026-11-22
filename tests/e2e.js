@@ -117,9 +117,80 @@ async function phone(br) {
   await ctx.close();
 }
 
+// Duel: desktop builds a team and sends a link; a phone opens it, builds its own team, fights and replies.
+async function buildDuelTeam(p, tapOrClick) {
+  await tapOrClick('[data-act=duelEdit]');
+  await tapOrClick('[data-slot=frame]'); await tapOrClick('[data-act=buy][data-key=brick]');
+  await tapOrClick('[data-act=close]');
+  await tapOrClick('[data-slot=drive]'); await tapOrClick('[data-act=buy][data-key=rollers]');
+  await tapOrClick('[data-act=close]');
+  await tapOrClick('[data-slot="weapon:0"]'); await tapOrClick('[data-act=buy][data-key=scatter]');
+  await tapOrClick('[data-act=close]');
+  await tapOrClick('[data-slot=plate]'); await tapOrClick('[data-act=buy][data-key=steel]');
+  await tapOrClick('[data-act=close]');
+  await tapOrClick('.duelbar [data-act=tab]');
+}
+
+async function duel(br) {
+  const ctx = await br.newContext({ viewport: { width: 1280, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', (e) => errs.push(e.message));
+  await p.goto(URL);
+  await p.click('text=Start');
+  await p.click('[data-tab=duel]');
+  await p.fill('#duelName', 'Tester <x>');
+  const click = (sel) => p.click(sel);
+  await buildDuelTeam(p, click);
+  check((await p.evaluate(() => window.__boltyard.duel.credits)) === 4000 - 320 - 60 - 220 - 280, 'duel: parts paid from the 4000 duel budget');
+  check((await p.evaluate(() => window.__boltyard.campaign.credits)) === 250, 'duel: campaign credits untouched');
+  await p.click('[data-act=duelShare]');
+  await p.waitForTimeout(300);
+  const link = await p.evaluate(() => window.__lastShare);
+  const clip = await p.evaluate(() => navigator.clipboard.readText());
+  check(/#duel=1~Tester-x~/.test(link) && clip === link, 'duel: challenge link copied (' + (link || '').length + ' chars)');
+  await shot(p, 'x1-duel-desktop');
+  check(errs.length === 0, 'duel desktop: no console errors ' + (errs.length ? JSON.stringify(errs) : ''));
+  await ctx.close();
+
+  const pc = await br.newContext({ ...devices['iPhone 13'] });
+  const q = await pc.newPage();
+  const qerrs = [];
+  q.on('pageerror', (e) => qerrs.push(e.message));
+  await q.goto(link);
+  await q.tap('text=Start');
+  check(await q.isVisible('.dcard.in'), 'duel phone: link opens the challenge card');
+  check((await q.textContent('.dcard.in b')).includes('Tester x'), 'duel phone: challenger name shown, unsafe characters removed');
+  check(await q.isDisabled('[data-act=duelfight]'), 'duel phone: must build a team before fighting');
+  await buildDuelTeam(q, (sel) => q.tap(sel));
+  await shot(q, 'x2-duel-phone');
+  await q.tap('[data-act=duelfight]');
+  await q.waitForTimeout(600);
+  const pt = await enemyPoint(q);
+  await q.touchscreen.tap(pt.x, pt.y);
+  check((await q.evaluate(() => window.__boltyard.battle.focus[0] && window.__boltyard.battle.focus[0].id)) === pt.id, 'duel phone: tap to focus fire works in duels');
+  await q.tap('#speedBtn'); await q.tap('#speedBtn');
+  await waitResult(q);
+  await shot(q, 'x3-duel-result');
+  const rec = await q.evaluate(() => window.__boltyard.duel.record['Tester x']);
+  check(rec && rec.w + rec.l === 1, 'duel phone: result recorded against the challenger');
+  await q.tap('[data-act=duelReply]');
+  await q.waitForTimeout(400);
+  const reply = await q.evaluate(() => window.__lastShare);
+  check(/#duel=1~anon~/.test(reply || ''), 'duel phone: reply link made from the phone team');
+  // a tampered link: same team with every part bumped to level 3
+  const bad = link.replace(/~[^~]+$/, '~51.43.73:73:73.43.43.0');
+  await q.goto('about:blank');
+  await q.goto(bad);
+  await q.waitForTimeout(300);
+  check((await q.textContent('#toast')) === 'Team is over the duel budget' && !(await q.isVisible('.dcard.in')), 'duel phone: over-budget link refused');
+  check(qerrs.length === 0, 'duel phone: no console errors ' + (qerrs.length ? JSON.stringify(qerrs) : ''));
+  await pc.close();
+}
+
 (async () => {
   const br = await chromium.launch();
-  try { await desktop(br); await phone(br); }
+  try { await desktop(br); await phone(br); await duel(br); }
   catch (e) { console.log('FAIL ' + e.message); failures++; }
   await br.close();
   console.log(failures ? `${failures} failed` : 'all passed');

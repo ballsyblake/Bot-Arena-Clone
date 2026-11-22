@@ -2,6 +2,7 @@
 import { ARENAS, TEAM_COLORS } from '../js/data.js';
 import { botStats, enemyBuild, buildIssue } from '../js/bot.js';
 import { runHeadless } from '../js/sim.js';
+import { encodeTeam, decodeTeam } from '../js/duel.js';
 
 let fails = 0;
 const check = (ok, msg) => { console.log((ok ? 'PASS ' : 'FAIL ') + msg); if (!ok) fails++; };
@@ -31,5 +32,19 @@ for (let i = 0; i < ARENAS.length; i++) {
   if (r.over) ends++;
 }
 check(ends === ARENAS.length, 'every arena fight ends');
+// duel links
+const dt = [{ build: { frame: { key: 'warden', lvl: 2 }, drive: { key: 'treads', lvl: 1 }, weapons: [{ key: 'arc', lvl: 1 }, { key: 'rivet', lvl: 3 }], plate: { key: 'steel', lvl: 1 }, module: null }, tactic: 'range' },
+  { build: { frame: { key: 'skiff', lvl: 1 }, drive: { key: 'hover', lvl: 1 }, weapons: [{ key: 'grinder', lvl: 1 }], plate: null, module: { key: 'booster', lvl: 1 } }, tactic: 'rush' }];
+const code = encodeTeam('Blake <b>', dt);
+const back = decodeTeam(code);
+check(!back.error && JSON.stringify(back.team) === JSON.stringify(dt), 'duel link round-trips a team');
+check(back.name === 'Blake b', 'duel link strips unsafe characters from names');
+check(decodeTeam('1~x~51.43.73:73:73.43.43.0').error === 'Team is over the duel budget', 'duel link over budget is rejected');
+check(!!decodeTeam('1~x~11.11.99.0.0.0').error, 'duel link with an unknown part is rejected');
+check(!!decodeTeam('1~x~11.11.51.44.0.0').error, 'duel link with a level above 3 is rejected');
+check(!!decodeTeam('1~x~11.11.51:51.0.0.0').error, 'duel link with too many weapons for the frame is rejected');
+check(!!decodeTeam('1~x~11.11.11.41.0.0').error, 'duel link with an overweight bot is rejected');
+check(!!decodeTeam('%E0%A4%A').error && !!decodeTeam('').error, 'garbage duel links are rejected');
+
 console.log(fails ? `${fails} failed` : 'all passed');
 process.exit(fails ? 1 : 0);
