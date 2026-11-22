@@ -18,6 +18,8 @@ python3 -m http.server 8123   # then visit http://localhost:8123/
 - **Arenas**: 20 fights in four leagues, each league ending in a boss. Each fight unlocks the next.
   Wins pay credits; losses and replays pay 25%, so you can never get stuck. From arena 6 enemy teams
   focus fire on your weakest bot. PWR numbers compare your team with the opponents.
+  Tapping an arena opens a briefing: map, enemy bots with their stats and tactic, the boss's line, and
+  three star goals (win, no bot lost, keep 50% HP). Stars 2 and 3 each pay a one-time 10% bonus.
 - **Duel**: build a team on a fixed 4000-credit budget (separate from the campaign) and send a
   challenge link. The team is packed into the link itself (`#duel=...`), so there is no server: your
   friend's browser checks every part and the budget, then runs the fight. They can send their team back.
@@ -36,6 +38,7 @@ python3 -m http.server 8123   # then visit http://localhost:8123/
 | `js/sim.js` | The battle simulation: movement, targeting, weapons, damage. No drawing, seeded random numbers, so the same seed replays the same fight. |
 | `js/render.js` | Canvas drawing of bots, arenas, effects, the battle camera and part icons. |
 | `js/duel.js` | Packs a duel team into a short link code and checks a received one (parts, levels, weight, budget). |
+| `js/sfx.js` | Sound effects made with the Web Audio API (no sound files), with a mute toggle. |
 | `js/main.js` | Save game (localStorage), garage and arena screens, battle loop and input. |
 
 ## Tests
