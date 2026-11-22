@@ -18,6 +18,8 @@ async function enemyPoint(p) {
   });
 }
 const credits = (p) => p.evaluate(() => window.__boltyard.state.credits);
+const waitCount = (p) => p.waitForFunction(() => document.querySelector('#count').classList.contains('hidden'), null, { timeout: 5000 });
+const starPay = (p, i, reward) => p.evaluate(([i, r]) => { const m = window.__boltyard.campaign.stars[i] || 0; return ((m & 2 ? 1 : 0) + (m & 4 ? 1 : 0)) * Math.round(r * 0.1); }, [i, reward]);
 const waitResult = (p) => p.waitForFunction(() => !document.querySelector('#result').classList.contains('hidden'), null, { timeout: 120000 });
 
 async function desktop(br) {
@@ -46,10 +48,18 @@ async function desktop(br) {
 
   await p.click('[data-tab=arenas]');
   await shot(p, 'd3-arenas');
-  const locked = await p.isDisabled('[data-act=fight][data-i="1"]');
+  const locked = await p.isDisabled('[data-act=brief][data-i="1"]');
   check(locked, 'desktop: arena 2 locked before arena 1 is won');
-  await p.click('[data-act=fight][data-i="0"]');
-  await p.waitForTimeout(400);
+  await p.click('[data-act=brief][data-i="0"]');
+  check(await p.isVisible('.brief .row.foe') && (await p.locator('.goals li').count()) === 3 && await p.isVisible('.brief .map'), 'desktop: briefing shows enemy, map and 3 star goals');
+  await shot(p, 'd3b-brief');
+  await p.click('#sheet [data-act=fight]');
+  check(await p.isVisible('#count'), 'desktop: countdown shows before the fight');
+  await p.waitForTimeout(300);
+  check((await p.evaluate(() => window.__boltyard.battle.t)) === 0, 'desktop: battle waits during countdown');
+  await shot(p, 'd3c-count');
+  await waitCount(p);
+  await p.waitForTimeout(200);
   const pt = await enemyPoint(p);
   await p.mouse.click(pt.x, pt.y);
   const focus = await p.evaluate(() => window.__boltyard.battle.focus[0] && window.__boltyard.battle.focus[0].id);
@@ -62,20 +72,29 @@ async function desktop(br) {
   await shot(p, 'd5-result');
   const won = (await p.textContent('#result h2')) === 'VICTORY';
   check(won, 'desktop: arena 1 won with the starter bot plus Tin');
-  check((await credits(p)) === 310, 'desktop: reward of 200 paid');
-  await p.click('[data-act=leave]');
+  const bonus = await starPay(p, 0, 200);
+  const mask = await p.evaluate(() => window.__boltyard.campaign.stars[0]);
+  check((mask & 1) && (await credits(p)) === 310 + bonus, `desktop: reward 200 + star bonus ${bonus} paid (stars mask ${mask})`);
+  check((await p.locator('.rstars i.on').count()) === [1, 2, 4].filter((b) => mask & b).length, 'desktop: result shows the stars earned');
+  await p.click('[data-act=nextBrief]');
+  check((await p.textContent('.brief header b')).includes('Twin Posts'), 'desktop: Next opens the arena 2 briefing');
+  await p.click('#sheet [data-act=close]');
+  check(await p.isVisible('.camp') && (await p.textContent('.camp')).includes('1/20'), 'desktop: campaign progress shows 1/20');
+  await p.click('#soundBtn');
+  check(await p.evaluate(() => localStorage.getItem('boltyard.snd') === '0' && document.querySelector('#soundBtn').classList.contains('off')), 'desktop: sound button mutes and remembers it');
+  await p.click('#soundBtn');
 
   await p.click('[data-tab=garage]');
   await p.click('[data-act=unlock][data-i="1"]');
   const bots = await p.evaluate(() => window.__boltyard.state.bots.length);
-  check(bots === 2 && (await credits(p)) === 10, 'desktop: bay 2 unlocked for 300');
+  check(bots === 2 && (await credits(p)) === 10 + bonus, 'desktop: bay 2 unlocked for 300');
   // new bot is empty and sits out; picking a weapon first is blocked until a frame is fitted
   await p.click('[data-slot=drive]');
   check(await p.isVisible('#sheet .issue'), 'desktop: empty bot asks for a frame first');
   await p.click('[data-act=close]');
 
   await p.reload();
-  check((await credits(p)) === 10 && (await p.evaluate(() => window.__boltyard.state.bots.length)) === 2, 'desktop: progress survives a reload');
+  check((await credits(p)) === 10 + bonus && (await p.evaluate(() => window.__boltyard.state.bots.length)) === 2, 'desktop: progress survives a reload');
   const overflow = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
   check(!overflow, 'desktop: no sideways scroll');
   check(errs.length === 0, 'desktop: no console errors ' + (errs.length ? JSON.stringify(errs) : ''));
@@ -97,8 +116,14 @@ async function phone(br) {
   await p.tap('[data-act=close]');
   await p.tap('[data-tab=arenas]');
   await shot(p, 'p3-arenas');
-  await p.tap('[data-act=fight][data-i="0"]');
-  await p.waitForTimeout(600);
+  await p.tap('[data-act=brief][data-i="0"]');
+  await shot(p, 'p3b-brief');
+  await p.tap('#sheet [data-act=fight]');
+  await p.waitForTimeout(500);
+  await p.touchscreen.tap(200, 400); // a tap skips the countdown
+  await waitCount(p);
+  check((await p.evaluate(() => window.__boltyard.battle.focus[0])) === null, 'phone: tap to skip countdown does not set focus');
+  await p.waitForTimeout(300);
   const portrait = await p.evaluate(() => window.__boltyard.battle.portrait);
   check(portrait, 'phone: arena turns portrait to fill the screen');
   const pt = await enemyPoint(p);
@@ -165,7 +190,8 @@ async function duel(br) {
   await buildDuelTeam(q, (sel) => q.tap(sel));
   await shot(q, 'x2-duel-phone');
   await q.tap('[data-act=duelfight]');
-  await q.waitForTimeout(600);
+  await waitCount(q);
+  await q.waitForTimeout(300);
   const pt = await enemyPoint(q);
   await q.touchscreen.tap(pt.x, pt.y);
   check((await q.evaluate(() => window.__boltyard.battle.focus[0] && window.__boltyard.battle.focus[0].id)) === pt.id, 'duel phone: tap to focus fire works in duels');
